@@ -1,0 +1,4 @@
+[workspace]
+members = [
+    "src/decentralized_rent_to_own_platform",
+]

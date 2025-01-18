@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "canisters": {
+    "decentralized_rent_to_own_platform": {
+      "type": "rust",
+      "package": "decentralized_rent_to_own_platform",
+      "candid": "src/decentralized_rent_to_own_platform/decentralized_rent_to_own_platform.did"
+    }
+  },
+  "output_env_file": ".env"
+}

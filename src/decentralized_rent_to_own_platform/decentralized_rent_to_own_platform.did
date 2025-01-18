@@ -1,0 +1,136 @@
+type AddMaintenanceRecordPayload = record {
+  cost : nat64;
+  description : text;
+  item_id : nat64;
+};
+type AssetCondition = variant { Fair; Good; Poor; Excellent; NeedsRepair };
+type AssetMetadata = record {
+  model : text;
+  manufacturer : text;
+  year : nat64;
+  additional_details : vec record { text; text };
+  serial_number : opt text;
+};
+type AssetNFT = record {
+  warranty_info : opt text;
+  asset_type : AssetType;
+  maintenance_history : vec MaintenanceRecord;
+  value : nat64;
+  is_leased : bool;
+  metadata : AssetMetadata;
+  description : text;
+  owner_id : text;
+  item_id : nat64;
+  asset_condition : AssetCondition;
+};
+type AssetPayload = record {
+  warranty_info : opt text;
+  asset_type : AssetType;
+  value : nat64;
+  metadata : AssetMetadata;
+  description : text;
+  asset_condition : AssetCondition;
+};
+type AssetType = variant { Furniture; Vehicle; Appliance; Other; Electronics };
+type ContractError = variant {
+  AccessDenied : text;
+  SystemError : text;
+  NotFound : text;
+  InvalidState : text;
+};
+type ContractStatus = variant {
+  Terminated;
+  Active;
+  Defaulted;
+  PendingApproval;
+  Completed;
+};
+type CreateLeaseContractPayload = record {
+  lease_terms : text;
+  early_payoff_discount : opt nat64;
+  lessee_id : text;
+  grace_period_days : nat64;
+  total_payments : nat64;
+  lease_duration : nat64;
+  item_id : nat64;
+  monthly_payment : nat64;
+};
+type LeaseContract = record {
+  lease_terms : text;
+  contract_id : nat64;
+  is_completed : bool;
+  early_payoff_discount : opt nat64;
+  owner_id : text;
+  payment_history : vec PaymentRecord;
+  lessee_id : text;
+  grace_period_days : nat64;
+  total_payments : nat64;
+  lease_end : nat64;
+  is_active : bool;
+  completed_payments : nat64;
+  lease_start : nat64;
+  last_payment_date : opt nat64;
+  item_id : nat64;
+  monthly_payment : nat64;
+  contract_status : ContractStatus;
+  maintenance_records : vec MaintenanceRecord;
+};
+type LeaseContractDetails = record {
+  contract : LeaseContract;
+  payment_status : PaymentStatus;
+  days_remaining : nat64;
+  next_payment_date : opt nat64;
+};
+type MaintenanceRecord = record {
+  service_date : nat64;
+  cost : nat64;
+  description : text;
+  performed_by : text;
+  record_id : nat64;
+  item_id : nat64;
+};
+type MakePaymentPayload = record {
+  transaction_hash : text;
+  payment_type : PaymentType;
+  contract_id : nat64;
+  amount : nat64;
+};
+type PaymentRecord = record {
+  payment_date : nat64;
+  transaction_hash : text;
+  payment_type : PaymentType;
+  contract_id : nat64;
+  lessee_id : text;
+  payment_id : nat64;
+  amount : nat64;
+};
+type PaymentStatus = variant {
+  Late : nat64;
+  GracePeriod : nat64;
+  Defaulted;
+  Current;
+};
+type PaymentType = variant {
+  SecurityDeposit;
+  Regular;
+  EarlyPayoff;
+  LatePayment;
+};
+type Result = variant { Ok : MaintenanceRecord; Err : text };
+type Result_1 = variant { Ok : AssetNFT; Err : text };
+type Result_2 = variant { Ok : LeaseContract; Err : text };
+type Result_3 = variant { Ok : LeaseContract; Err : ContractError };
+type Result_4 = variant { Ok : LeaseContractDetails; Err : ContractError };
+type Result_5 = variant { Ok : vec PaymentRecord; Err : text };
+type TerminateContractPayload = record { contract_id : nat64; reason : text };
+service : {
+  add_maintenance_record : (AddMaintenanceRecordPayload) -> (Result);
+  create_asset_nft : (AssetPayload) -> (Result_1);
+  create_lease_contract : (CreateLeaseContractPayload) -> (Result_2);
+  get_asset_details : (nat64) -> (Result_1) query;
+  get_lease_contract : (nat64) -> (Result_3) query;
+  get_lease_contract_details : (nat64) -> (Result_4) query;
+  get_payment_history : (nat64) -> (Result_5) query;
+  make_payment : (MakePaymentPayload) -> (Result_2);
+  terminate_contract : (TerminateContractPayload) -> (Result_2);
+}
