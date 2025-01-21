@@ -324,9 +324,31 @@ fn calculate_next_payment_date(contract: &LeaseContract) -> Option<u64> {
  *
  */
 
+/// Function to validate an AssetPayload
+fn validate_asset_payload(payload: &AssetPayload) -> Result<(), String> {
+    if payload.description.trim().is_empty() {
+        return Err("Description cannot be empty.".to_string());
+    }
+    if payload.value == 0 {
+        return Err("Value must be greater than 0.".to_string());
+    }
+    if payload.asset_condition.trim().is_empty() {
+        return Err("Asset condition cannot be empty.".to_string());
+    }
+    if payload.asset_type.trim().is_empty() {
+        return Err("Asset type cannot be empty.".to_string());
+    }
+    Ok(())
+}
+
+
 // Create AssetNFT
 #[ic_cdk::update]
 fn create_asset_nft(payload: AssetPayload) -> Result<AssetNFT, String> {
+    // Validate the payload
+    validate_asset_payload(&payload)?;
+
+    // Generate a unique ID for the new asset
     let item_id = ID_COUNTER
         .with(|counter| {
             let current_value = *counter.borrow().get();
@@ -334,6 +356,7 @@ fn create_asset_nft(payload: AssetPayload) -> Result<AssetNFT, String> {
         })
         .expect("Failed to generate asset ID");
 
+    // Create a new asset
     let asset = AssetNFT {
         item_id,
         owner_id: ic_cdk::caller().to_string(),
@@ -347,9 +370,11 @@ fn create_asset_nft(payload: AssetPayload) -> Result<AssetNFT, String> {
         metadata: payload.metadata,
     };
 
+    // Store the asset in the stable map
     ASSETS.with(|assets| assets.borrow_mut().insert(item_id, asset.clone()));
     Ok(asset)
 }
+
 
 //
 #[ic_cdk::query]
@@ -362,65 +387,55 @@ fn get_asset_details(item_id: u64) -> Result<AssetNFT, String> {
     })
 }
 
-// Create Lease Contract
-#[ic_cdk::update]
-fn create_lease_contract(payload: CreateLeaseContractPayload) -> Result<LeaseContract, String> {
-    // Verify asset availability
-    ASSETS.with(|assets| {
-        let assets = assets.borrow();
-        if let Some(asset) = assets.get(&payload.item_id) {
-            if asset.is_leased {
-                return Err("Asset is already leased".to_string());
-            }
-        } else {
-            return Err("Asset not found".to_string());
-        }
-        Ok(())
-    })?;
+/// Function to validate a LeasePayload
+fn validate_lease_payload(payload: &LeasePayload) -> Result<(), String> {
+    if payload.asset_id == 0 {
+        return Err("Asset ID must be greater than 0.".to_string());
+    }
+    if payload.lessee_id.trim().is_empty() {
+        return Err("Lessee ID cannot be empty.".to_string());
+    }
+    if payload.lease_duration == 0 {
+        return Err("Lease duration must be greater than 0.".to_string());
+    }
+    if payload.lease_start_time == 0 {
+        return Err("Lease start time must be provided.".to_string());
+    }
+    Ok(())
+}
 
-    let contract_id = ID_COUNTER
+
+// Create lease contract
+#[ic_cdk::update]
+fn create_lease_contract(payload: LeasePayload) -> Result<LeaseContract, String> {
+    // Validate the payload
+    validate_lease_payload(&payload)?;
+
+    // Generate a unique ID for the new lease contract
+    let contract_id = LEASE_COUNTER
         .with(|counter| {
             let current_value = *counter.borrow().get();
             counter.borrow_mut().set(current_value + 1)
         })
         .expect("Failed to generate contract ID");
 
-    let lease_contract = LeaseContract {
+    // Calculate the lease end time
+    let lease_end_time = payload.lease_start_time + payload.lease_duration;
+
+    // Create the lease contract
+    let lease = LeaseContract {
         contract_id,
-        item_id: payload.item_id,
-        owner_id: ic_cdk::caller().to_string(),
+        asset_id: payload.asset_id,
+        lessor_id: ic_cdk::caller().to_string(),
         lessee_id: payload.lessee_id,
-        lease_terms: payload.lease_terms,
-        total_payments: payload.total_payments,
-        completed_payments: 0,
-        monthly_payment: payload.monthly_payment,
-        lease_start: time(),
-        lease_end: time() + payload.lease_duration,
-        is_active: true,
-        is_completed: false,
-        payment_history: Vec::new(),
-        last_payment_date: None,
-        grace_period_days: payload.grace_period_days,
-        early_payoff_discount: payload.early_payoff_discount,
-        maintenance_records: Vec::new(),
-        contract_status: ContractStatus::Active,
+        lease_duration: payload.lease_duration,
+        lease_start_time: payload.lease_start_time,
+        lease_end_time,
     };
 
-    // Update asset status
-    ASSETS.with(|assets| {
-        let mut assets = assets.borrow_mut();
-        if let Some(mut asset) = assets.get(&payload.item_id) {
-            asset.is_leased = true;
-            assets.insert(payload.item_id, asset);
-        }
-    });
-
-    LEASE_CONTRACTS.with(|contracts| {
-        contracts
-            .borrow_mut()
-            .insert(contract_id, lease_contract.clone())
-    });
-    Ok(lease_contract)
+    // Store the lease in the stable map
+    LEASES.with(|leases| leases.borrow_mut().insert(contract_id, lease.clone()));
+    Ok(lease)
 }
 
 // Fetch lease contract by id
